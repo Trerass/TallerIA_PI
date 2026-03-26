@@ -11,7 +11,31 @@
         </div>
         <button type="submit" class="btn btn-primary">Search</button>
     </form>   
-    <p>Searching for: {{searchTerm}}</p> 
+    <p>Searching for: {{searchTerm}}</p>
+
+    {% if similar_movies %}
+        <h3>Películas similares a tu búsqueda</h3>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            {% for similar in similar_movies %}
+            <div class="col">
+                <div class="card">
+                    {% if similar.image_url %}
+                    <img src="{{ similar.image_url }}" class="card-img-top" alt="{{ similar.title }}">
+                    {% endif %}
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold">{{ similar.title }}</h5>
+                        <p class="card-text">{{ similar.description }}</p>
+                        <p class="card-text">{{ similar.genre }}</p>
+                        <p class="card-text">{{ similar.year }}</p>
+                        <p class="card-text"><strong>Similitud:</strong> {{ similar.similarity|floatformat:4 }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <hr />
+    {% endif %}
+
     <div class="row row-cols-1 row-cols-md-3 g-4"> <!-- define una fila en una cuadrícula con una columna en pantallas extra pequeñas y tres columnas en pantallas grandes-->
         {% for movie in movies %}
         <div v-for="movie in movies" class="col">

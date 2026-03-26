@@ -1,23 +1,75 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-
 from .models import Movie
-
 import matplotlib.pyplot as plt
 import matplotlib
 import io
 import urllib, base64
+from openai import OpenAI
+from dotenv import load_dotenv
+import numpy as np
+import os
+
+# Cargar la API Key de OpenAI
+load_dotenv('./openAI.env')
+openai_client = OpenAI(api_key=os.environ.get('openai_apikey'))
+
+# Función para calcular similitud de coseno
+
+def cosine_similarity(a, b):
+    if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
+        return 0.0
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+def embed_text(text):
+    if not text:
+        return None
+    response = openai_client.embeddings.create(input=[text], model='text-embedding-3-small')
+    return np.array(response.data[0].embedding, dtype=np.float32)
+
 
 def home(request):
-    #return HttpResponse('<h1>Welcome to Home Page</h1>')
-    #return render(request, 'home.html')
-    #return render(request, 'home.html', {'name':'Paola Vallejo'})
-    searchTerm = request.GET.get('searchMovie') # GET se usa para solicitar recursos de un servidor
+    searchTerm = request.GET.get('searchMovie', '').strip()
+
     if searchTerm:
         movies = Movie.objects.filter(title__icontains=searchTerm)
+
+        # Buscar películas más similares a la consulta usando embeddings
+        query_emb = embed_text(searchTerm)
+        similar_movies = []
+
+        if query_emb is not None:
+            for movie in Movie.objects.all():
+                try:
+                    movie_emb = np.frombuffer(movie.emb, dtype=np.float32)
+                except Exception:
+                    continue
+                similar_movies.append((cosine_similarity(query_emb, movie_emb), movie))
+
+            similar_movies.sort(key=lambda x: x[0], reverse=True)
+            similar_movies = [
+                {
+                    'title': m.title,
+                    'description': m.description or '',
+                    'genre': m.genre,
+                    'year': m.year,
+                    'image_url': m.image.url if m.image else '',
+                    'similarity': sim,
+                }
+                for sim, m in similar_movies[:5]
+            ]
+        else:
+            similar_movies = []
     else:
         movies = Movie.objects.all()
-    return render(request, 'home.html', {'searchTerm':searchTerm, 'movies':movies})
+        similar_movies = []
+
+    return render(request, 'home.html', {
+        'searchTerm': searchTerm,
+        'movies': movies,
+        'similar_movies': similar_movies,
+    })
 
 
 def about(request):
